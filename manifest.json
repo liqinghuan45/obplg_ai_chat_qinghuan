@@ -1,0 +1,11 @@
+{
+  "id": "qinghuan-ai",
+  "name": "清欢的AI",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "一个功能丰富的AI对话插件。支持多模型切换(GPT3.5/4、Claude等)、图片上传与识别、历史记录管理、专注模式、字体大小调节等功能。可通过快捷键快速唤起对话窗口,支持拖拽上传图片,自动保存对话记录。",
+  "author": "李清欢",
+  "authorUrl": "https://example.com",
+  "isDesktopOnly": false,
+  "main": "main.js"
+}

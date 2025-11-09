@@ -1,0 +1,21 @@
+# 排除敏感配置文件
+data.json
+
+# 排除开发配置
+.claude/
+desktop.ini
+
+# 排除临时文件
+*.tmp
+*.temp
+
+# 排除日志文件
+*.log
+
+# 排除系统文件
+.DS_Store
+Thumbs.db
+
+# 排除备份文件
+*.bak
+*.backup

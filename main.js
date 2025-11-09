@@ -1052,6 +1052,7 @@ class ChatView extends ItemView {
         this.messages = [];
         this.handleWheel = this.handleWheel.bind(this);
         this.autoScroll = true; // 添加自动滚动标志位
+        this.isReceivingResponse = false; // 添加AI回复状态标志
     }
 
     getViewType() {
@@ -2437,9 +2438,12 @@ class ChatView extends ItemView {
     async handleSendMessage() {
         const content = this.textarea.value.trim();
         if (!content && this.pendingImages.length === 0) return;
-        
+
         // 重置自动滚动状态
         this.autoScroll = true;  // 添加这一行
+
+        // 设置正在接收AI回复的状态
+        this.isReceivingResponse = true;
         
         // 保存图片URL到消息中
         const messageWithImages = {
@@ -3198,6 +3202,9 @@ class ChatView extends ItemView {
                 }
 
                 throw error;
+            } finally {
+                // 无论成功还是失败，都重置AI回复状态
+                this.isReceivingResponse = false;
             }
         }
     }
@@ -3380,6 +3387,13 @@ class ChatView extends ItemView {
     // 新增：将chatHistory渲染到界面
     renderMessages(skipScroll = false) {
         console.log('开始渲染消息');
+
+        // 检查是否正在接收AI回复，如果是则跳过重新渲染以避免气泡消失
+        if (this.isReceivingResponse) {
+            console.log('正在接收AI回复，跳过消息重新渲染');
+            return;
+        }
+
         this.messagesContainer.empty();
         this.messages = [...this.plugin.settings.chatHistory]; // 从chatHistory同步this.messages
         console.log('要渲染的消息数量:', this.messages.length);

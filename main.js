@@ -412,23 +412,27 @@ class SettingsModal extends Modal {
                         this.plugin.settings.currentSystemMessage = config.currentSystemMessage || '';
                         
                         // 更新系统消息下拉菜单
-                        const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
-                        if (systemMessageSelect) {
-                            Array.from(systemMessageSelect.options).forEach(option => {
-                                option.selected = option.value === config.currentSystemMessageFile;
-                            });
+                        if (this.rightPanel) {
+                            const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
+                            if (systemMessageSelect) {
+                                Array.from(systemMessageSelect.options).forEach(option => {
+                                    option.selected = option.value === config.currentSystemMessageFile;
+                                });
+                            }
                         }
                     } else {
                         // 如果配置没有系统消息文件，则将系统消息设置为空
                         this.plugin.settings.currentSystemMessageFile = '';
                         this.plugin.settings.currentSystemMessage = '';
-                        
+
                         // 更新系统消息下拉菜单
-                        const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
-                        if (systemMessageSelect) {
-                            Array.from(systemMessageSelect.options).forEach(option => {
-                                option.selected = option.value === '';
-                            });
+                        if (this.rightPanel) {
+                            const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
+                            if (systemMessageSelect) {
+                                Array.from(systemMessageSelect.options).forEach(option => {
+                                    option.selected = option.value === '';
+                                });
+                            }
                         }
                     }
                     
@@ -2103,13 +2107,43 @@ class ChatView extends ItemView {
         });
 
         // 创建输入域
-        const inputArea = rightPanel.createDiv({ 
+        const inputArea = rightPanel.createDiv({
             cls: 'chat-ai-input-area',
             attr: {
-                style: 'display: flex; flex-direction: column; padding: 12px; gap: 8px;'
+                style: 'display: flex; flex-direction: column; padding: 12px; gap: 8px; position: relative;'
             }
         });
 
+        // 创建拖拽手柄
+        const dragHandle = inputArea.createDiv({
+            cls: 'qinghuan-ai-drag-handle'
+        });
+
+        
+        // 添加拖拽功能来调节输入框高度
+        this.initializeDragResize(dragHandle, inputArea);
+
+        // 从设置中恢复保存的高度
+        if (this.plugin.settings.inputAreaHeight) {
+            const savedHeight = this.plugin.settings.inputAreaHeight;
+            if (savedHeight >= 80 && savedHeight <= 400) {
+                // 延迟应用保存的高度，确保DOM元素已完全创建
+                setTimeout(() => {
+                    inputArea.style.setProperty('height', savedHeight + 'px', 'important');
+                    inputArea.style.setProperty('min-height', savedHeight + 'px', 'important');
+                    inputArea.style.setProperty('max-height', savedHeight + 'px', 'important');
+                    inputArea.style.setProperty('flex', `0 0 ${savedHeight}px`, 'important');
+
+                    // 同时调整textarea高度
+                    if (this.textarea) {
+                        const textareaHeight = Math.max(40, savedHeight - 60);
+                        this.textarea.style.setProperty('max-height', textareaHeight + 'px', 'important');
+                        this.textarea.style.setProperty('min-height', textareaHeight + 'px', 'important');
+                        this.textarea.style.setProperty('height', textareaHeight + 'px', 'important');
+                    }
+                }, 100);
+            }
+        }
 
         // 创建输入框和按钮的容
         const inputButtonContainer = inputArea.createDiv({
@@ -2119,12 +2153,12 @@ class ChatView extends ItemView {
         });
 
         // 创建左侧输入框
-        this.textarea = inputButtonContainer.createEl('textarea', { 
-            cls: 'chat-ai-textarea', 
-            attr: { 
+        this.textarea = inputButtonContainer.createEl('textarea', {
+            cls: 'chat-ai-textarea',
+            attr: {
                 rows: 3,
                 placeholder: '此处输入……',
-                style: 'flex: 1; min-height: 80px; max-height: 200px; margin: 0; padding: 12px; box-sizing: border-box; line-height: 1.5;'
+                style: 'flex: 1; min-height: 60px; max-height: 200px; margin: 0; padding: 12px; box-sizing: border-box; line-height: 1.5; resize: none;'
             }
         });
 
@@ -3198,6 +3232,11 @@ class ChatView extends ItemView {
     }
 
     async updateDropdowns() {
+        // 安全检查：确保rightPanel存在
+        if (!this.rightPanel) {
+            return;
+        }
+
         // 更新下拉菜单的选中状态
         const baseUrlSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(1)');
         const apiKeySelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(2)');
@@ -3596,6 +3635,95 @@ class ChatView extends ItemView {
                 }
             }
         });
+    }
+
+    // 初始化拖拽调节输入框高度功能
+    initializeDragResize(dragHandle, inputArea) {
+        let isDragging = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        // 鼠标按下事件
+        const handleMouseDown = (e) => {
+            isDragging = true;
+            startY = e.clientY || e.touches[0].clientY;
+            startHeight = inputArea.offsetHeight;
+
+            // 防止选中文本和事件冒泡
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 设置拖拽状态的样式
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'ns-resize';
+            dragHandle.style.backgroundColor = 'var(--interactive-accent)';
+            dragHandle.style.opacity = '0.2';
+        };
+
+        // 鼠标移动事件
+        const handleMouseMove = (e) => {
+            if (!isDragging) return;
+
+            const currentY = e.clientY || e.touches[0].clientY;
+            const deltaY = currentY - startY;
+            const newHeight = Math.max(80, Math.min(400, startHeight - deltaY)); // 修正：使用减法，向下拖拽增加高度
+
+            // 设置新高度，使用!important确保覆盖CSS规则
+            inputArea.style.setProperty('height', newHeight + 'px', 'important');
+            inputArea.style.setProperty('min-height', newHeight + 'px', 'important');
+            inputArea.style.setProperty('max-height', newHeight + 'px', 'important');
+            inputArea.style.setProperty('flex', `0 0 ${newHeight}px`, 'important');
+
+            // 如果存在textarea，也需要调整其高度
+            if (this.textarea) {
+                const textareaHeight = Math.max(40, newHeight - 60); // 最小40px，最大根据输入区域高度计算
+                this.textarea.style.setProperty('max-height', textareaHeight + 'px', 'important');
+                this.textarea.style.setProperty('min-height', textareaHeight + 'px', 'important');
+                this.textarea.style.setProperty('height', textareaHeight + 'px', 'important');
+            }
+        };
+
+        // 鼠标释放事件
+        const handleMouseUp = () => {
+            if (isDragging) {
+                isDragging = false;
+
+                // 恢复样式
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                // 移除拖拽时的背景色，让CSS处理悬停效果
+                dragHandle.style.removeProperty('background-color');
+                dragHandle.style.removeProperty('opacity');
+
+                // 保存当前高度到设置
+                const currentHeight = parseInt(inputArea.style.height);
+                if (currentHeight && currentHeight >= 80 && currentHeight <= 400) {
+                    // 保存到插件的设置中
+                    if (this.plugin && this.plugin.settings) {
+                        this.plugin.settings.inputAreaHeight = currentHeight;
+                        this.plugin.saveSettings();
+                    }
+                }
+            }
+        };
+
+        // 绑定事件
+        dragHandle.addEventListener('mousedown', handleMouseDown);
+        dragHandle.addEventListener('touchstart', handleMouseDown);
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('touchmove', handleMouseMove);
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('touchend', handleMouseUp);
+
+        // 存储事件处理器引用以便清理
+        dragHandle._cleanup = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('touchmove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('touchend', handleMouseUp);
+        };
     }
 
     // 处理图片上传
@@ -4471,6 +4599,11 @@ class ChatView extends ItemView {
             this.configButtonsContainer.remove();
         }
 
+        // 安全检查：确保rightPanel存在
+        if (!this.rightPanel) {
+            return;
+        }
+
         // 找到导航头部容器
         const navButtonsContainer = this.rightPanel.querySelector('.nav-buttons-container');
         if (!navButtonsContainer) {
@@ -4732,23 +4865,27 @@ class ChatView extends ItemView {
                             this.plugin.settings.currentSystemMessage = config.currentSystemMessage || '';
                             
                             // 更新系统消息下拉菜单
-                            const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
-                            if (systemMessageSelect) {
-                                Array.from(systemMessageSelect.options).forEach(option => {
-                                    option.selected = option.value === config.currentSystemMessageFile;
-                                });
+                            if (this.rightPanel) {
+                                const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
+                                if (systemMessageSelect) {
+                                    Array.from(systemMessageSelect.options).forEach(option => {
+                                        option.selected = option.value === config.currentSystemMessageFile;
+                                    });
+                                }
                             }
                         } else {
                             // 如果配置没有系统消息文件，则将系统消息设置为空
                             this.plugin.settings.currentSystemMessageFile = '';
                             this.plugin.settings.currentSystemMessage = '';
-                            
+
                             // 更新系统消息下拉菜单
-                            const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
-                            if (systemMessageSelect) {
-                                Array.from(systemMessageSelect.options).forEach(option => {
-                                    option.selected = option.value === '';
-                                });
+                            if (this.rightPanel) {
+                                const systemMessageSelect = this.rightPanel.querySelector('.chat-ai-dropdown:nth-child(4)');
+                                if (systemMessageSelect) {
+                                    Array.from(systemMessageSelect.options).forEach(option => {
+                                        option.selected = option.value === '';
+                                    });
+                                }
                             }
                         }
                         
@@ -7211,18 +7348,19 @@ style.textContent = `
 
     /* 输入区域容器样式 */
     .workspace-leaf-content[data-type="${CHAT_VIEW_TYPE}"] .chat-ai-input-area {
-        flex: 0 0 120px !important; // 使用 !important 确保高度固定
+        flex: 0 0 auto !important; // 改为auto，允许动态调整高度
         border-top: 1px solid var(--divider-color);
         background: transparent;
         padding: 16px;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        height: 120px !important; // 使用固定高度
-        min-height: 120px !important;
-        max-height: 120px !important;
+        height: 120px !important; // 保持初始高度
+        min-height: 80px !important; // 允许最小高度
+        max-height: 400px !important; // 允许最大高度
         box-sizing: border-box;
         overflow: hidden; // 防止内容溢出
+        resize: none; // 禁用浏览器默认的resize行为
     }
 
     /* 输入框样式 */

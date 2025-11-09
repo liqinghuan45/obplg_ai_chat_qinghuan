@@ -29,10 +29,49 @@
 }
 
 /* 输入区域样式 */
-.qinghuan-ai-input-area {
+.chat-ai-input-area {
   margin-top: auto;
   padding: 10px 0;
   border-top: 1px solid var(--background-modifier-border);
+  position: relative;
+}
+
+/* 拖拽手柄样式 */
+.qinghuan-ai-drag-handle {
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background-color: transparent;
+  cursor: ns-resize;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.qinghuan-ai-drag-handle:hover {
+  background-color: var(--interactive-accent);
+  opacity: 0.1;
+}
+
+.qinghuan-ai-drag-handle::before {
+  content: '';
+  width: 40px;
+  height: 2px;
+  background-color: var(--text-muted);
+  border-radius: 1px;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.qinghuan-ai-drag-handle:hover::before {
+  background-color: var(--interactive-accent);
+  opacity: 0.8;
+  width: 60px;
+  height: 3px;
 }
 
 .qinghuan-ai-input {

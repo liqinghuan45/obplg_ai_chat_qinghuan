@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS = {
     historyPath: '', // 添加历史记录路径设置，默认为空
     temperature: 0.7, // 添加默认温度值
     useProxy: false, // 添加代理开关设置
-    proxyUrl: 'http://115.231.176.146:8989/proxy', // 添加代理地址设置
+    proxyUrl: '', // 代理地址设置，在插件设置中填写
     systemMessagePath: 'A重要文件/system_message', // 添加system message文件夹路径
     currentSystemMessage: '', // 当前使用的system message内容
     currentSystemMessageFile: '', // 当前选择的system message文件名

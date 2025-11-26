@@ -1082,7 +1082,6 @@ class ChatView extends ItemView {
         this.messages = [];
         this.handleWheel = this.handleWheel.bind(this);
         this.autoScroll = true; // 添加自动滚动标志位
-        this.isReceivingResponse = false; // 添加AI回复状态标志
     }
 
     getViewType() {
@@ -2458,12 +2457,9 @@ class ChatView extends ItemView {
     async handleSendMessage() {
         const content = this.textarea.value.trim();
         if (!content && this.pendingImages.length === 0) return;
-
+        
         // 重置自动滚动状态
         this.autoScroll = true;  // 添加这一行
-
-        // 设置正在接收AI回复的状态
-        this.isReceivingResponse = true;
         
         // 保存图片URL到消息中
         const messageWithImages = {
@@ -3005,167 +3001,66 @@ class ChatView extends ItemView {
                 let accumulatedContent = '';
 
                 if (useStreaming) {
-                    // 流式处理
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
+                    let buffer = '';
+                    let streamComplete = false;
 
-                    while (true) {
+                    const processLine = async (rawLine) => {
+                        const line = rawLine.trim();
+                        if (!line) return false;
+                        if (line === 'data: [DONE]') {
+                            return true;
+                        }
+                        if (!line.startsWith('data:')) {
+                            return false;
+                        }
+
+                        try {
+                            const jsonStr = line.replace(/^data:\s*/, '');
+                            const json = JSON.parse(jsonStr);
+                            const content = json.choices[0]?.delta?.content || '';
+
+                            if (content) {
+                                accumulatedContent += content;
+
+                                contentContainer.empty(); // 清空容器，移除加载动画或旧内容
+                                await MarkdownRenderer.renderMarkdown(
+                                    accumulatedContent,
+                                    contentContainer,
+                                    this.plugin.app.workspace.getActiveFile()?.path || '',
+                                    this
+                                );
+
+                                if (this.autoScroll) {
+                                    this.scrollToBottom();
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('解析流数据时出错:', e);
+                        }
+                        return false;
+                    };
+
+                    while (!streamComplete) {
                         const { done, value } = await reader.read();
                         if (done) break;
 
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split(/\r?\n/);
+                        buffer = lines.pop() ?? '';
+
                         for (const line of lines) {
-                            if (line.trim() === '') continue;
-                            if (line.trim() === 'data: [DONE]') continue;
-                            
-                            try {
-                                const jsonStr = line.replace(/^data: /, '');
-                                const json = JSON.parse(jsonStr);
-                                
-                                // 添加更多的空值检查
-                                if (json && json.choices && json.choices[0] && json.choices[0].delta) {
-                                    const content = json.choices[0].delta.content || '';
-                                    
-                                    if (content) {
-                                        accumulatedContent += content;
-                                        
-                                        contentContainer.empty(); // 清空容器，移除加载动画或旧内容
-                                        await MarkdownRenderer.renderMarkdown(
-                                            accumulatedContent,
-                                            contentContainer,
-                                            this.plugin.app.workspace.getActiveFile()?.path || '',
-                                            this
-                                        );
-                                        
-                                        // 只有在autoScroll为true时才滚动到底部，尊重用户的滚动意图
-                                        if (this.autoScroll) {
-                                            this.scrollToBottom();
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('解析流数据时出错:', e);
-                                // 继续处理下一行数据，不中断整个过程
-                                continue;
+                            if (await processLine(line)) {
+                                streamComplete = true;
+                                break;
                             }
                         }
                     }
-                } else {
-                    // 非流式处理
-                    const responseData = await response.json();
-                    accumulatedContent = responseData.choices[0]?.message?.content || '';
-                    
-                    // 直接渲染完整内容
-                    contentContainer.empty(); // 清空容器，移除加载动画
-                    await MarkdownRenderer.renderMarkdown(
-                        accumulatedContent,
-                        contentContainer,
-                        this.plugin.app.workspace.getActiveFile()?.path || '',
-                        this
-                    );
-                    if (this.autoScroll) {
-                        this.scrollToBottom();
-                        setTimeout(() => {
-                            if (this.autoScroll) {
-                                this.scrollToBottom();
-                            }
-                        }, 0);
-                    }
-                }
 
-                // 保存图片并替换内容为内部链接
-                const processedContentProxy = await this.postProcessAssistantImages(assistantMessageEl, accumulatedContent);
-
-                // 更新消息数组中的内容
-                const lastMessage = this.messages[this.messages.length - 1];
-                if (lastMessage && lastMessage.role === 'assistant') {
-                    lastMessage.content = processedContentProxy;
-                    // 同步最新聊天历史，防止气泡丢失
-                    this.plugin.settings.chatHistory = [...this.messages];
-                    await this.plugin.saveSettings(true); // 跳过视图更新，避免DOM重新渲染导致滚动跳转
-                }
-
-                // 设置复制按钮事件（基于处理后的文本）
-                const copyBtn = assistantMessageEl.querySelector('.chat-ai-copy-button');
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(this.cleanTextContent(processedContentProxy));
-                    new Notice('已复制到剪贴板');
-                };
-
-            } else {
-                // 原有的直接请求方式
-                const requestData = {
-                    model: this.plugin.settings.currentModel,
-                    messages: apiPayloadMessages, // 使用构建好的 apiPayloadMessages
-                    stream: useStreaming, // 使用面板中的流式控件状态
-                    temperature: this.plugin.settings.temperature,
-                    max_tokens: this.plugin.settings.maxTokens // 添加最大补全长度参数
-                };
-
-                if (this.plugin.settings.logRequestParams) {
-                    console.log('请求参数:', requestData);
-                }
-
-                const response = await fetch(requestApiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API请求失败: ${response.status} - ${response.statusText}\n${errorText}`);
-                }
-
-                const contentContainer = assistantMessageEl.querySelector('.message-content');
-                let accumulatedContent = '';
-
-                if (useStreaming) {
-                    // 流式处理
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        
-                        for (const line of lines) {
-                            if (line.trim() === '') continue;
-                            if (line.trim() === 'data: [DONE]') continue;
-                            
-                            try {
-                                const jsonStr = line.replace(/^data: /, '');
-                                const json = JSON.parse(jsonStr);
-                                const content = json.choices[0]?.delta?.content || '';
-                                
-                                if (content) {
-                                    accumulatedContent += content;
-                                    
-                                    contentContainer.empty(); // 清空容器，移除加载动画或旧内容
-                                    await MarkdownRenderer.renderMarkdown(
-                                        accumulatedContent,
-                                        contentContainer,
-                                        this.plugin.app.workspace.getActiveFile()?.path || '',
-                                        this
-                                    );
-                                    
-                                    // 只有在autoScroll为true时才滚动到底部，尊重用户的滚动意图
-                                    if (this.autoScroll) {
-                                        this.scrollToBottom();
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('解析流数据时出错:', e);
-                            }
-                        }
+                    buffer += decoder.decode();
+                    if (!streamComplete && buffer.trim()) {
+                        await processLine(buffer);
                     }
                 } else {
                     // 非流式处理
@@ -3235,9 +3130,6 @@ class ChatView extends ItemView {
 
                 throw error;
             }
-        } finally {
-            // 无论成功还是失败，都重置AI回复状态
-            this.isReceivingResponse = false;
         }
     }
 
@@ -3419,13 +3311,6 @@ class ChatView extends ItemView {
     // 新增：将chatHistory渲染到界面
     renderMessages(skipScroll = false) {
         console.log('开始渲染消息');
-
-        // 检查是否正在接收AI回复，如果是则跳过重新渲染以避免气泡消失
-        if (this.isReceivingResponse) {
-            console.log('正在接收AI回复，跳过消息重新渲染');
-            return;
-        }
-
         this.messagesContainer.empty();
         this.messages = [...this.plugin.settings.chatHistory]; // 从chatHistory同步this.messages
         console.log('要渲染的消息数量:', this.messages.length);

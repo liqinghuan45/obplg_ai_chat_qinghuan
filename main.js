@@ -6705,11 +6705,20 @@ module.exports = class CallAIChatPlugin extends Plugin {
                     return;
                 }
 
-                const currentIndex = files.findIndex(f => f.path === this.settings.currentHistoryFile);
+                const currentHistoryFile = this.settings.currentHistoryFile;
+                console.log('当前历史文件:', currentHistoryFile);
+                console.log('文件列表:', files.map(f => f.path));
+                
+                // 检查当前历史文件是否真实存在于文件列表中
+                let currentIndex = files.findIndex(f => f.path === currentHistoryFile);
+                console.log('当前索引:', currentIndex);
+                
                 // 如果当前没有加载历史文件，从第一个（最新的）开始；否则加载更早的一个
                 const nextIndex = currentIndex === -1 ? 0 : currentIndex + 1;
+                console.log('下一个索引:', nextIndex);
                 
                 if (nextIndex < files.length) {
+                    console.log('加载文件:', files[nextIndex].path);
                     await this.loadHistoryFile(files[nextIndex]);
                     
                     // 在所有打开的ChatView中滚动到底部

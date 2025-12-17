@@ -1,0 +1,14 @@
+{
+  "name": "清欢AI聊天",
+  "version": "1.0.0",
+  "buildDate": "2025-11-09T00:33:24.583Z",
+  "files": [
+    "main.js",
+    "manifest.json",
+    "styles.css",
+    "README.md"
+  ],
+  "description": "使用AI编辑器开发的Obsidian AI聊天插件",
+  "author": "李清欢",
+  "repository": "https://github.com/liqinghuan45/obplg_ai_chat_qinghuan"
+}

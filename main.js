@@ -1490,16 +1490,28 @@ class ChatView extends ItemView {
             // 创建历史记录项的函数
             const createHistoryItem = (file, isStarred = false, section = null) => {
                 const historyItem = document.createElement('div');
-                historyItem.className = `chat-ai-history-item ${isStarred ? 'chat-ai-starred' : ''}`;
+                const isCurrentFile = file.path === this.plugin.settings.currentHistoryFile;
+                historyItem.className = `chat-ai-history-item ${isStarred ? 'chat-ai-starred' : ''} ${isCurrentFile ? 'chat-ai-history-item-active' : ''}`;
                 historyItem.style = 'padding: 8px; margin-bottom: 8px; border-radius: 4px; background: var(--background-modifier-hover); cursor: pointer; transition: background-color 0.2s; position: relative;';
                 historyItem.setAttribute('data-path', file.path);
                 
+                // 如果是当前加载的历史记录，添加聚焦样式
+                if (isCurrentFile) {
+                    historyItem.style.background = 'var(--interactive-accent)';
+                    historyItem.style.color = 'var(--text-on-accent)';
+                    historyItem.style.boxShadow = '0 2px 8px rgba(var(--interactive-accent-rgb), 0.3)';
+                }
+                
                 // 添加悬停效果
                 historyItem.addEventListener('mouseover', () => {
-                    historyItem.style.backgroundColor = 'var(--background-primary-alt)';
+                    if (!historyItem.classList.contains('chat-ai-history-item-active')) {
+                        historyItem.style.backgroundColor = 'var(--background-primary-alt)';
+                    }
                 });
                 historyItem.addEventListener('mouseout', () => {
-                    historyItem.style.backgroundColor = 'var(--background-modifier-hover)';
+                    if (!historyItem.classList.contains('chat-ai-history-item-active')) {
+                        historyItem.style.backgroundColor = 'var(--background-modifier-hover)';
+                    }
                 });
                 
                 // 创建历史记录项内容
@@ -1727,6 +1739,21 @@ class ChatView extends ItemView {
                 // 添加点击事件
                 historyItem.addEventListener('click', async () => {
                     try {
+                        // 移除其他项的聚焦状态
+                        const allItems = historyListContainer.querySelectorAll('.chat-ai-history-item');
+                        allItems.forEach(item => {
+                            item.classList.remove('chat-ai-history-item-active');
+                            item.style.background = 'var(--background-modifier-hover)';
+                            item.style.color = '';
+                            item.style.boxShadow = '';
+                        });
+                        
+                        // 添加当前项的聚焦状态
+                        historyItem.classList.add('chat-ai-history-item-active');
+                        historyItem.style.background = 'var(--interactive-accent)';
+                        historyItem.style.color = 'var(--text-on-accent)';
+                        historyItem.style.boxShadow = '0 2px 8px rgba(var(--interactive-accent-rgb), 0.3)';
+
                         // 加载历史记录
                         const chatHistory = await this.plugin.loadHistoryFile(file);
                         if (chatHistory && chatHistory.length > 0) {
@@ -6679,9 +6706,10 @@ module.exports = class CallAIChatPlugin extends Plugin {
                 }
 
                 const currentIndex = files.findIndex(f => f.path === this.settings.currentHistoryFile);
-                const nextIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, files.length - 1);
+                // 如果当前没有加载历史文件，从第一个（最新的）开始；否则加载更早的一个
+                const nextIndex = currentIndex === -1 ? 0 : currentIndex + 1;
                 
-                if (nextIndex !== currentIndex) {
+                if (nextIndex < files.length) {
                     await this.loadHistoryFile(files[nextIndex]);
                     
                     // 在所有打开的ChatView中滚动到底部

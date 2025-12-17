@@ -8510,6 +8510,35 @@ class ParameterEditModal extends Modal {
         
         // 如果是 model 类型，只显示单列
         if (this.paramType === 'model') {
+            // 创建工具栏容器
+            const toolbarContainer = mainContainer.createDiv({
+                cls: 'parameter-edit-toolbar',
+                attr: {
+                    style: 'display: flex; gap: 8px; margin-bottom: 8px;'
+                }
+            });
+
+            // 去重按钮
+            const dedupeButton = toolbarContainer.createEl('button', {
+                cls: 'parameter-edit-button',
+                text: '去重',
+                attr: {
+                    style: 'padding: 4px 12px; font-size: 0.9em;'
+                }
+            });
+
+            dedupeButton.addEventListener('click', () => {
+                const lines = this.textArea.value.split('\n').map(line => line.trim()).filter(line => line);
+                const uniqueLines = [...new Set(lines)];
+                const removedCount = lines.length - uniqueLines.length;
+                this.textArea.value = uniqueLines.join('\n');
+                if (removedCount > 0) {
+                    new Notice(`已移除 ${removedCount} 个重复项`);
+                } else {
+                    new Notice('没有发现重复项');
+                }
+            });
+
             // 创建文本区域用于编辑所有参数
             this.textArea = mainContainer.createEl('textarea', {
                 cls: 'parameter-edit-textarea',

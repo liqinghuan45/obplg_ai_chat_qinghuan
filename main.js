@@ -6612,6 +6612,9 @@ module.exports = class CallAIChatPlugin extends Plugin {
     async onload() {
         // 加载和应用默认设置
         await this.loadSettings();
+
+        // 启动时检查并创建历史记录目录
+        await this.ensureHistoryFolderOnStartup();
     
         // 注册自定义视图，添加 navigation 属性为 false
         this.registerView(
@@ -6910,6 +6913,22 @@ module.exports = class CallAIChatPlugin extends Plugin {
 
     addStyle() {
         // 这里可以添加全局样式，如果需要的话
+    }
+
+    // 启动时检查并创建历史记录目录
+    async ensureHistoryFolderOnStartup() {
+        const historyPath = this.settings.historyPath;
+        if (!historyPath) return; // 如果没有配置路径，直接返回
+
+        const folder = this.app.vault.getAbstractFileByPath(historyPath);
+        if (!(folder instanceof TFolder)) {
+            try {
+                await this.app.vault.createFolder(historyPath);
+                console.log('启动时创建历史记录文件夹:', historyPath);
+            } catch (error) {
+                console.error('启动时创建历史记录文件夹失败:', error);
+            }
+        }
     }
 
     // 新增：保存聊天历史到文件
